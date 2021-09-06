@@ -23,6 +23,7 @@ enum struct Bosses
 {
 	char name[64];
 	char model[PLATFORM_MAX_PATH];
+	char description[128];
 
 	TFClassType class;
 
@@ -33,12 +34,13 @@ enum struct Bosses
 
 	StringMap attributes;
 
-	void AddBoss(const char[] name, const char[] model)
+	void AddBoss(const char[] name, const char[] model, const char[] description)
 	{
 		this.Reset();
 
 		strcopy(this.name, 64, name);
 		strcopy(this.model, PLATFORM_MAX_PATH, model);
+		strcopy(this.description, 128, description);
 
 		if (strlen(this.model) > 0)
 			PrecacheModel(this.model);
@@ -94,6 +96,9 @@ enum struct Boss
 
 		this.rage_cooldown = -1;
 		this.rage_active = false;
+
+		PrintToChat(this.client, "Boss Set: %s", g_Bosses[this.boss].name);
+		ShowBossInfoMenu(this.client, this.boss);
 	}
 
 	void SetRandomBoss(int client)
@@ -101,6 +106,9 @@ enum struct Boss
 		this.client = client;
 		this.boss = GetRandomInt(0, g_TotalBosses - 1);
 		this.ApplyBossChanges();
+
+		PrintToChat(this.client, "Boss Randomly Set: %s", g_Bosses[this.boss].name);
+		ShowBossInfoMenu(this.client, this.boss);
 	}
 
 	void ApplyBossChanges()
@@ -165,6 +173,20 @@ enum struct Boss
 		SetEntProp(this.client, Prop_Send, "m_bCustomModelRotates", 0);
 		SetEntProp(this.client, Prop_Send, "m_bUseClassAnimations", 0);
 		SDKUnhook(this.client, SDKHook_GetMaxHealth, Boss_GetMaxHealth);
+
+		StringMapSnapshot snap = g_Bosses[this.boss].attributes.Snapshot();
+
+		for (int i = 0; i < snap.Length; i++)
+		{
+			int size = snap.KeyBufferSize(i);
+
+			char[] key = new char[size];
+			snap.GetKey(i, key, size);
+
+			TF2Attrib_RemoveByName(this.client, key);
+		}
+
+		TF2Attrib_RemoveMoveSpeedBonus(this.client);
 	}
 
 	int GetBossMaxHealth()
@@ -211,6 +233,13 @@ public void OnPluginStart()
 	SetupBossData();
 }
 
+public void OnPluginEnd()
+{
+	for (int i = 0; i < 1; i++)
+		if (g_Boss[i].client > 0)
+			g_Boss[i].RemoveBossChanges();
+}
+
 public void OnMapStart()
 {
 	PrecacheSound("coach/coach_go_here.wav");
@@ -220,7 +249,7 @@ void SetupBossData()
 {
 	g_TotalBosses = 0;
 
-	g_Bosses[g_TotalBosses].AddBoss("Saxton Hale", "models/player/saxtonhale/saxtonhale.mdl");
+	g_Bosses[g_TotalBosses].AddBoss("Saxton Hale", "models/player/saxtonhale/saxtonhale.mdl", "Grants temporary invincibility for a limited time on rage use.");
 	g_Bosses[g_TotalBosses].class = TFClass_Soldier;
 	g_Bosses[g_TotalBosses].base_health = 500;
 	g_Bosses[g_TotalBosses].health_multi = 0.25;
@@ -228,10 +257,66 @@ void SetupBossData()
 	g_Bosses[g_TotalBosses].AddAttribute("increased jump height", 4.0);
 	g_TotalBosses++;
 
-	g_Bosses[g_TotalBosses].AddBoss("Vagineer", "models/player/saxtonhale/vagineer.mdl");
+	g_Bosses[g_TotalBosses].AddBoss("Vagineer", "models/player/saxtonhale/vagineer.mdl", "Spawns a mini level 2 sentry on rage use.");
 	g_Bosses[g_TotalBosses].class = TFClass_Engineer;
 	g_Bosses[g_TotalBosses].base_health = 500;
 	g_Bosses[g_TotalBosses].health_multi = 0.15;
+	g_Bosses[g_TotalBosses].hide_weapon = true;
+	g_Bosses[g_TotalBosses].AddAttribute("increased jump height", 4.0);
+	g_TotalBosses++;
+
+	g_Bosses[g_TotalBosses].AddBoss("Christian Brutal Sniper", "models/player/saxtonhale/cbs_v4.mdl", "Abilities are not done yet for this boss.");
+	g_Bosses[g_TotalBosses].class = TFClass_Sniper;
+	g_Bosses[g_TotalBosses].base_health = 500;
+	g_Bosses[g_TotalBosses].health_multi = 0.10;
+	g_Bosses[g_TotalBosses].hide_weapon = false;
+	g_Bosses[g_TotalBosses].AddAttribute("increased jump height", 4.0);
+	g_TotalBosses++;
+	
+	g_Bosses[g_TotalBosses].AddBoss("Easter Demo", "models/player/saxtonhale/easter_demo.mdl", "Abilities are not done yet for this boss.");
+	g_Bosses[g_TotalBosses].class = TFClass_DemoMan;
+	g_Bosses[g_TotalBosses].base_health = 500;
+	g_Bosses[g_TotalBosses].health_multi = 0.25;
+	g_Bosses[g_TotalBosses].hide_weapon = true;
+	g_Bosses[g_TotalBosses].AddAttribute("increased jump height", 4.0);
+	g_TotalBosses++;
+
+	g_Bosses[g_TotalBosses].AddBoss("Horseless Headless Horsemann", "models/player/saxtonhale/hhh_jr_mk3.mdl", "Abilities are not done yet for this boss.");
+	g_Bosses[g_TotalBosses].class = TFClass_DemoMan;
+	g_Bosses[g_TotalBosses].base_health = 500;
+	g_Bosses[g_TotalBosses].health_multi = 0.25;
+	g_Bosses[g_TotalBosses].hide_weapon = true;
+	g_Bosses[g_TotalBosses].AddAttribute("increased jump height", 4.0);
+	g_TotalBosses++;
+	
+	g_Bosses[g_TotalBosses].AddBoss("Billy", "models/player/freakfortress2/billy.mdl", "Abilities are not done yet for this boss.");
+	g_Bosses[g_TotalBosses].class = TFClass_DemoMan;
+	g_Bosses[g_TotalBosses].base_health = 500;
+	g_Bosses[g_TotalBosses].health_multi = 0.25;
+	g_Bosses[g_TotalBosses].hide_weapon = true;
+	g_Bosses[g_TotalBosses].AddAttribute("increased jump height", 4.0);
+	g_TotalBosses++;
+
+	g_Bosses[g_TotalBosses].AddBoss("DemoPan", "models/player/freakfortress2/demopan_v1.mdl", "Abilities are not done yet for this boss.");
+	g_Bosses[g_TotalBosses].class = TFClass_DemoMan;
+	g_Bosses[g_TotalBosses].base_health = 500;
+	g_Bosses[g_TotalBosses].health_multi = 0.25;
+	g_Bosses[g_TotalBosses].hide_weapon = true;
+	g_Bosses[g_TotalBosses].AddAttribute("increased jump height", 4.0);
+	g_TotalBosses++;
+
+	g_Bosses[g_TotalBosses].AddBoss("NinjaSpy", "models/player/freakfortress2/ninjaspy_v2_2.mdl", "Abilities are not done yet for this boss.");
+	g_Bosses[g_TotalBosses].class = TFClass_Spy;
+	g_Bosses[g_TotalBosses].base_health = 500;
+	g_Bosses[g_TotalBosses].health_multi = 0.25;
+	g_Bosses[g_TotalBosses].hide_weapon = true;
+	g_Bosses[g_TotalBosses].AddAttribute("increased jump height", 4.0);
+	g_TotalBosses++;
+	
+	g_Bosses[g_TotalBosses].AddBoss("GentleSpy", "models/player/freakfortress2/the_gentlespy_v1.mdl", "Abilities are not done yet for this boss.");
+	g_Bosses[g_TotalBosses].class = TFClass_Spy;
+	g_Bosses[g_TotalBosses].base_health = 500;
+	g_Bosses[g_TotalBosses].health_multi = 0.25;
 	g_Bosses[g_TotalBosses].hide_weapon = true;
 	g_Bosses[g_TotalBosses].AddAttribute("increased jump height", 4.0);
 	g_TotalBosses++;
@@ -239,11 +324,19 @@ void SetupBossData()
 
 public void TF2_OnRoundStart(bool full_reset)
 {
+	PrintToChatAll("Finding new boss...");
+	CreateTimer(2.0, Timer_DelayRoundStart, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action Timer_DelayRoundStart(Handle timer)
+{
 	if (GetClientAliveCount() < 1)
 		return;
 	
-	int client = GetRandomClient(true, false, false, 0);
-	g_Boss[0].SetBoss(client, 1);
+	int client = GetRandomClient(true, false, true, 0);
+	g_Boss[0].SetRandomBoss(client);
+
+	PrintToChatAll("Boss Found in %N.", client);
 
 	for (int i = 1; i <= MaxClients; i++)
 		if (IsClientInGame(i) && TF2_GetClientTeam(client) > TFTeam_Spectator && GetClientBoss(i) == NO_BOSS)
@@ -333,11 +426,16 @@ void TF2Attrib_ApplyMoveSpeedBonus(int client, float value)
 	TF2_AddCondition(client, TFCond_SpeedBuffAlly, 0.0);
 }
 
+void TF2Attrib_RemoveMoveSpeedBonus(int client)
+{
+	TF2Attrib_RemoveByName(client, "move speed bonus");
+	TF2_AddCondition(client, TFCond_SpeedBuffAlly, 0.0);
+}
+
 public Action TF2_OnCallMedic(int client)
 {
 	int boss = GetClientBoss(client);
-	PrintToChat(client, "Boss: %i", boss);
-	
+
 	if (boss != NO_BOSS)
 	{
 		int time = GetTime();
@@ -465,4 +563,27 @@ void VectorAddRotatedOffset(const float angle[3], float buffer[3], const float o
     AddVectors(vecAdd, vecUp, vecAdd);
 
     AddVectors(buffer, vecAdd, buffer);
+}
+
+void ShowBossInfoMenu(int client, int boss)
+{
+	char sTitle[64];
+	FormatEx(sTitle, sizeof(sTitle), "Boss Information: %s", g_Bosses[boss].name);
+
+	Panel panel = new Panel();
+	panel.SetTitle(sTitle);
+
+	panel.DrawText(g_Bosses[boss].description);
+	panel.DrawItem("Exit");
+
+	panel.Send(client, MenuHandler_Void, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_Void(Menu menu, MenuAction action, int param1, int param2)
+{
+	switch (action)
+	{
+		case MenuAction_End:
+			delete menu;
+	}
 }
